@@ -1,8 +1,8 @@
 package com.medpro.medpro.enums;
 
 public enum Especialidade {
+    ORTOPEDIA,
     CARDIOLOGIA,
-    DERMATOLOGIA,
     GINECOLOGIA,
-    ORTOPEDIA
+    DERMATOLOGIA;
 }

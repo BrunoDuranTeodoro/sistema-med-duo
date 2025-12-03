@@ -1,14 +1,28 @@
 package com.medpro.medpro.repository;
 
-import java.time.LocalDateTime;
-
-import org.springframework.data.jpa.repository.JpaRepository;
 import com.medpro.medpro.model.entity.Consulta;
-import com.medpro.medpro.model.entity.StatusConsulta;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+
+import java.time.LocalDateTime;
 
 public interface ConsultaRepository extends JpaRepository<Consulta, Long> {
 
-    Boolean existsByMedicoIdAndData_consultaAndStatus(Long idMedico, LocalDateTime data, StatusConsulta status);
+        @Query("""
+                        select count(c) > 0 from Consulta c
+                        where c.medico.id = :idMedico
+                        and c.data > :horarioInicio
+                        and c.data < :horarioFim
+                        and c.motivoCancelamento is null
+                        """)
+        Boolean existsByMedicoIdAndDataConflict(Long idMedico, LocalDateTime horarioInicio, LocalDateTime horarioFim);
 
-    Boolean existsByPacienteIdAndData_consultaBetweenAndStatus(Long idPaciente, LocalDateTime primeiroHorario, LocalDateTime ultimoHorario, StatusConsulta status);
+        @Query("""
+                        select count(c) > 0 from Consulta c
+                        where c.paciente.id = :idPaciente
+                        and c.data between :primeiroHorario and :ultimoHorario
+                        and c.motivoCancelamento is null
+                        """)
+        Boolean existsByPacienteIdAndDataBetween(Long idPaciente, LocalDateTime primeiroHorario,
+                        LocalDateTime ultimoHorario);
 }

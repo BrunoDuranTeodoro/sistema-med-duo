@@ -1,4 +1,3 @@
-
 package com.medpro.medpro.model.dto;
 
 import jakarta.validation.constraints.NotNull;

@@ -10,10 +10,11 @@ import org.springframework.data.jpa.repository.Query;
 import com.medpro.medpro.enums.Especialidade;
 import com.medpro.medpro.model.entity.Medico;
 
-public interface MedicoRepository extends JpaRepository<Medico, Long>{
-     Page<Medico> findAllByAtivoTrue(Pageable paginacao);
-    
-     @Query("""
+public interface MedicoRepository extends JpaRepository<Medico, Long> {
+
+    Page<Medico> findAllByAtivoTrue(Pageable paginacao);
+
+    @Query("""
             select m from Medico m
             where
             m.ativo = true
@@ -23,12 +24,13 @@ public interface MedicoRepository extends JpaRepository<Medico, Long>{
             m.id not in(
                 select c.medico.id from Consulta c
                 where
-                c.data_consulta = :data
+                c.data = :data
                 and
-                c.status = 'ATIVA'
+                c.motivoCancelamento is null
             )
             order by rand()
             limit 1
             """)
-    Optional<Medico> escolherMedicoAleatorioLivreNaData(Especialidade especialidade, LocalDateTime data);
+    Medico escolherMedicoAleatorioLivreNaData(Especialidade especialidade, LocalDateTime data);
+
 }
