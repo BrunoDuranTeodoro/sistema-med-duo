@@ -1,14 +1,13 @@
 package com.medpro.medpro.service;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.medpro.medpro.domain.validacoes.agendamento.ValidadorAgendamentoDeConsulta;
-import com.medpro.medpro.infra.exeption.ValidacaoException;
+import com.medpro.medpro.domain.validacoes.cancelamento.ValidadorCancelamentoDeConsulta;
+import com.medpro.medpro.infra.execption.ValidacaoException;
 import com.medpro.medpro.model.dto.DadosAgendamentoConsulta;
 import com.medpro.medpro.model.dto.DadosCancelamentoConsulta;
 import com.medpro.medpro.model.dto.DadosDetalhamentoConsulta;
@@ -29,9 +28,12 @@ public class AgendaDeConsultas {
     @Autowired
     private PacienteRepository pacienteRepository;
 
-    // Injeta todos os validadores que implementam a interface (SOLID)
     @Autowired
     private List<ValidadorAgendamentoDeConsulta> validadores;
+
+    // INJEÇÃO DOS VALIDADORES DE CANCELAMENTO (Faltava isso)
+    @Autowired
+    private List<ValidadorCancelamentoDeConsulta> validadoresCancelamento;
 
     public DadosDetalhamentoConsulta agendar(DadosAgendamentoConsulta dados) {
         if (!pacienteRepository.existsById(dados.idPaciente())) {
@@ -41,7 +43,6 @@ public class AgendaDeConsultas {
             throw new ValidacaoException("Id do médico informado não existe!");
         }
 
-        // Executa todas as validações de regra de negócio
         validadores.forEach(v -> v.validar(dados));
 
         var paciente = pacienteRepository.getReferenceById(dados.idPaciente());
@@ -51,7 +52,8 @@ public class AgendaDeConsultas {
             throw new ValidacaoException("Não existe médico disponível nessa data!");
         }
 
-        var consulta = new Consulta(null, paciente, medico, dados.data(), StatusConsulta.ATIVA, null);
+        // Criação da consulta (ajustado para usar construtores padrões ou Lombok corretamente)
+        var consulta = new Consulta(null, medico, paciente, dados.data());
         consultaRepository.save(consulta);
 
         return new DadosDetalhamentoConsulta(consulta);
@@ -62,21 +64,15 @@ public class AgendaDeConsultas {
             throw new ValidacaoException("Id da consulta informado não existe!");
         }
 
+        // Executa os validadores de cancelamento (ex: ValidadorHorarioAntecedencia)
+        // Isso substitui o bloco 'if (diferencaEmHoras < 24)' que estava fixo aqui
+        validadoresCancelamento.forEach(v -> v.validar(dados));
+
         var consulta = consultaRepository.getReferenceById(dados.idConsulta());
+        consulta.cancelar(dados.motivo());
         
-        // Regra de cancelamento: Antecedência mínima de 24h
-        var agora = LocalDateTime.now();
-        var diferencaEmHoras = Duration.between(agora, consulta.getData_consulta()).toHours();
-
-        if (diferencaEmHoras < 24) {
-            throw new ValidacaoException("Consulta somente pode ser cancelada com antecedência mínima de 24h!");
-        }
-
-        // Atualiza estado e motivo
-        consulta.setStatus(StatusConsulta.CANCELADA);
-        consulta.setMotivo_cancelamento(dados.motivo());
-        // Como estamos num contexto transacional (via controller), o JPA salva automaticamente, 
-        // mas podemos chamar save explícito se preferir.
+        // Opcional: consultaRepository.save(consulta); 
+        // (Se estiver rodando em contexto @Transactional, o save é automático, mas explicitar não faz mal)
     }
 
     private Medico escolherMedico(DadosAgendamentoConsulta dados) {
@@ -88,7 +84,6 @@ public class AgendaDeConsultas {
             throw new ValidacaoException("Especialidade é obrigatória quando médico não for escolhido!");
         }
 
-        return medicoRepository.escolherMedicoAleatorioLivreNaData(dados.especialidade(), dados.data())
-                .orElseThrow(() -> new ValidacaoException("Nenhum médico disponível nessa data!"));
+        return medicoRepository.escolherMedicoAleatorioLivreNaData(dados.especialidade(), dados.data());
     }
 }
