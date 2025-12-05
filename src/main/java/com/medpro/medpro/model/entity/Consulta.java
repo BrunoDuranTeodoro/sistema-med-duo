@@ -1,10 +1,20 @@
 package com.medpro.medpro.model.entity;
 
 import java.time.LocalDateTime;
+
 import com.medpro.medpro.enums.MotivoCancelamento;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.Future;
-import jakarta.validation.constraints.NotNull;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -36,17 +46,11 @@ public class Consulta {
     @Enumerated(EnumType.STRING)
     private MotivoCancelamento motivoCancelamento;
 
-    // --- ADICIONE ESTE CONSTRUTOR ---
-    public Consulta(Long id, Medico medico, Paciente paciente, LocalDateTime data) {
-        this.id = id;
-        this.medico = medico;
-        this.paciente = paciente;
-        this.data = data;
-        // motivoCancelamento começa null automaticamente, indicando consulta ativa
-    }
-
     public void cancelar(MotivoCancelamento motivo) {
         this.motivoCancelamento = motivo;
     }
 
+    public Consulta(Object object, Medico medico2, Paciente paciente2, LocalDateTime data2) {
+        
+    }
 }
