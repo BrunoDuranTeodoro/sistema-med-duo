@@ -3,196 +3,220 @@ const API_PACIENTES = "http://localhost:8089/pacientes";
 const API_MEDICOS = "http://localhost:8089/medicos";
 
 document.addEventListener("DOMContentLoaded", () => {
-  carregarPacientesSelect();
-  carregarMedicosSelect();
-  listarConsultas();
+    carregarPacientesSelect();
+    carregarMedicosSelect();
+    listarConsultas();
 });
+
+// Função utilitária para mostrar notificações Toast
+function mostrarNotificacao(texto, tipo = "success") {
+    Toastify({
+        text: texto,
+        duration: 3000,
+        gravity: "top",
+        position: "right",
+        style: {
+            background: tipo === "success" ? "linear-gradient(to right, #00b09b, #96c93d)" : "linear-gradient(to right, #ff5f6d, #ffc371)",
+        }
+    }).showToast();
+}
+
+// Função para gerenciar estado de loading no botão
+function setButtonLoading(btnId, isLoading) {
+    const btn = document.getElementById(btnId);
+    if (isLoading) {
+        btn.dataset.originalText = btn.innerText;
+        btn.innerHTML = 'Processando... <div class="spinner"></div>';
+        btn.disabled = true;
+    } else {
+        btn.innerText = btn.dataset.originalText || "Enviar";
+        btn.disabled = false;
+    }
+}
 
 // --- CARREGAR SELECT DE PACIENTES ---
 async function carregarPacientesSelect() {
-  try {
-    const response = await fetch(API_PACIENTES);
-    const data = await response.json();
-    const select = document.getElementById("selectPaciente");
-
-    select.innerHTML = '<option value="">Selecione um paciente...</option>';
-
-    if (data.content) {
-      data.content.forEach((p) => {
-        const option = document.createElement("option");
-        option.value = p.id;
-        option.text = `${p.nome} (CPF: ${p.cpf})`;
-        select.appendChild(option);
-      });
+    try {
+        const response = await fetch(API_PACIENTES);
+        const data = await response.json();
+        const select = document.getElementById("selectPaciente");
+        select.innerHTML = '<option value="">Selecione um paciente...</option>';
+        
+        if (data.content) {
+            data.content.forEach((p) => {
+                const option = document.createElement("option");
+                option.value = p.id;
+                option.text = `${p.nome} (CPF: ${p.cpf})`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        mostrarNotificacao("Erro ao carregar pacientes", "error");
     }
-  } catch (error) {
-    console.error("Erro ao carregar pacientes:", error);
-    document.getElementById("selectPaciente").innerHTML =
-      "<option>Erro ao carregar</option>";
-  }
 }
 
 // --- CARREGAR SELECT DE MÉDICOS ---
 async function carregarMedicosSelect() {
-  try {
-    const response = await fetch(API_MEDICOS);
-    const data = await response.json();
-    const select = document.getElementById("selectMedico");
+    try {
+        const response = await fetch(API_MEDICOS);
+        const data = await response.json();
+        const select = document.getElementById("selectMedico");
+        select.innerHTML = '<option value="">Selecione um médico (ou aleatório)...</option>';
 
-    select.innerHTML =
-      '<option value="">Selecione um médico (ou aleatório)...</option>';
-
-    if (data.content) {
-      data.content.forEach((m) => {
-        const option = document.createElement("option");
-        option.value = m.id;
-        option.text = `${m.nome} - ${m.especialidade}`;
-        select.appendChild(option);
-      });
+        if (data.content) {
+            data.content.forEach((m) => {
+                const option = document.createElement("option");
+                option.value = m.id;
+                option.text = `${m.nome} - ${m.especialidade}`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+         mostrarNotificacao("Erro ao carregar médicos", "error");
     }
-  } catch (error) {
-    console.error("Erro ao carregar médicos:", error);
-  }
 }
 
-// --- LISTAR CONSULTAS (TABELA DIREITA) ---
+// --- LISTAR CONSULTAS ---
 async function listarConsultas() {
-  try {
-    const response = await fetch(API_CONSULTAS);
-    const data = await response.json();
-    const tbody = document.querySelector("#tabelaConsultas tbody");
-    tbody.innerHTML = "";
+    try {
+        const response = await fetch(API_CONSULTAS);
+        const data = await response.json();
+        const tbody = document.querySelector("#tabelaConsultas tbody");
+        tbody.innerHTML = "";
 
-    if (data.content && data.content.length > 0) {
-      data.content.forEach((c) => {
-        const dataFormatada = new Date(c.data).toLocaleString("pt-BR");
+        if (data.content && data.content.length > 0) {
+            data.content.forEach((c) => {
+                const dataFormatada = new Date(c.data).toLocaleString("pt-BR", { dateStyle: 'short', timeStyle: 'short' });
+                
+                let statusBadge = `<span style="color: green; font-weight: bold;">Agendada</span>`;
+                let classeRow = "";
 
-        // Verifica se tem motivo de cancelamento
-        let statusTexto = "Agendada";
-        let classeCor = "status-ativo";
+                if (c.motivoCancelamento) {
+                    statusBadge = `<span style="color: red;">Cancelada (${c.motivoCancelamento})</span>`;
+                    classeRow = "status-cancelado"; // Definido no CSS original
+                }
 
-        if (c.motivoCancelamento) {
-          statusTexto = `Cancelada: ${c.motivoCancelamento}`;
-          classeCor = "status-cancelado";
-        }
+                const tr = document.createElement("tr");
+                if (classeRow) tr.classList.add(classeRow);
 
-        const tr = document.createElement("tr");
-        if (classeCor) tr.classList.add(classeCor);
-
-        tr.innerHTML = `
+                tr.innerHTML = `
             <td>${c.id}</td>
             <td>${c.medico}</td>
             <td>${c.paciente}</td>
             <td>${dataFormatada}</td>
-            <td>${statusTexto}</td>
+            <td>${statusBadge}</td>
         `;
-        tbody.appendChild(tr);
-      });
-    } else {
-      tbody.innerHTML =
-        '<tr><td colspan="5" style="text-align:center;">Nenhuma consulta encontrada.</td></tr>';
+                tbody.appendChild(tr);
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Nenhuma consulta encontrada.</td></tr>';
+        }
+    } catch (error) {
+        console.error("Erro consultas:", error);
     }
-  } catch (error) {
-    console.error("Erro consultas:", error);
-  }
 }
 
 // --- AGENDAR CONSULTA (POST) ---
-document
-  .getElementById("formAgendamento")
-  .addEventListener("submit", async (e) => {
+document.getElementById("formAgendamento").addEventListener("submit", async (e) => {
     e.preventDefault();
     const resultDiv = document.getElementById("resultAgendamento");
     resultDiv.style.display = "none";
+    
+    const btnSubmit = e.target.querySelector("button[type='submit']");
+    const btnId = btnSubmit.id || "btnAgendarSubmit"; // Garanta que o botão no HTML tenha ID ou use seletor
+    btnSubmit.id = btnId; 
+
+    setButtonLoading(btnId, true);
 
     const idPaciente = document.getElementById("selectPaciente").value;
     const idMedico = document.getElementById("selectMedico").value;
     const dataHora = document.getElementById("data").value;
 
-    if (!idPaciente) {
-      alert("Selecione um paciente!");
-      return;
-    }
-
     const payload = { idPaciente: idPaciente, data: dataHora };
     if (idMedico) payload.idMedico = idMedico;
 
     try {
-      const response = await fetch(API_CONSULTAS, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+        const response = await fetch(API_CONSULTAS, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
 
-      // Tenta ler o corpo da resposta como JSON
-      const data = await response.json().catch(() => null);
+        const data = await response.json().catch(() => null);
 
-      if (response.ok) {
-        resultDiv.className = "result success";
-        resultDiv.innerHTML = `Sucesso! Consulta agendada.`;
-        resultDiv.style.display = "block";
-        listarConsultas();
-      } else {
-        // Lógica para extrair a mensagem de erro correta
-        let msg = "Erro ao agendar.";
-        
-        if (data) {
-          if (Array.isArray(data)) {
-            // Caso 1: Lista de erros de validação (ex: campos nulos)
-            msg = data.map(erro => `- ${erro.mensagem}`).join("<br>");
-          } else if (data.message) {
-            // Caso 2: Erro de negócio (ex: clínica fechada)
-            msg = data.message;
-          }
+        if (response.ok) {
+            Swal.fire({
+                title: 'Sucesso!',
+                text: 'Consulta agendada com sucesso.',
+                icon: 'success',
+                confirmButtonText: 'Ok'
+            });
+            document.getElementById("formAgendamento").reset();
+            listarConsultas();
+        } else {
+            let msg = "Erro desconhecido";
+            if (data) {
+                 if (Array.isArray(data)) msg = data.map(e => e.mensagem).join("\n");
+                 else if (data.message) msg = data.message;
+            }
+            throw new Error(msg);
         }
-        
-        throw new Error(msg);
-      }
     } catch (error) {
-      resultDiv.className = "result error";
-      resultDiv.innerHTML = error.message; // Alterado de innerText para innerHTML para suportar quebras de linha (<br>)
-      resultDiv.style.display = "block";
+        Swal.fire({
+            title: 'Erro!',
+            html: error.message.replace(/\n/g, "<br>"), // Quebra de linha no SweetAlert
+            icon: 'error',
+            confirmButtonText: 'Fechar'
+        });
+    } finally {
+        setButtonLoading(btnId, false);
     }
-  });
+});
 
 // --- CANCELAR CONSULTA (DELETE) ---
-document
-  .getElementById("formCancelamento")
-  .addEventListener("submit", async (e) => {
+document.getElementById("formCancelamento").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const resultDiv = document.getElementById("resultCancelamento");
+    
+    // Confirmação antes de enviar
+    const confirmacao = await Swal.fire({
+        title: 'Tem certeza?',
+        text: "Você não poderá reverter isso!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sim, cancelar!',
+        cancelButtonText: 'Voltar'
+    });
+
+    if (!confirmacao.isConfirmed) return;
+
+    const idConsulta = document.getElementById("idConsulta").value;
+    const motivo = document.getElementById("motivo").value;
 
     const payload = {
-      idConsulta: document.getElementById("idConsulta").value,
-      motivo: document.getElementById("motivo").value,
+        idConsulta: idConsulta,
+        motivo: motivo,
     };
 
     try {
-      const response = await fetch(API_CONSULTAS, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json().catch(() => null);
-
-      if (response.status === 204) {
-        resultDiv.className = "result success";
-        resultDiv.innerText = "Consulta cancelada!";
-        resultDiv.style.display = "block";
-        listarConsultas();
-        document.getElementById("formCancelamento").reset();
-      } else {
-        // Aplica a mesma lógica de erro para o cancelamento
-        let msg = "Erro ao cancelar.";
-        if (data && data.message) {
-             msg = data.message;
+        const response = await fetch(API_CONSULTAS, {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        
+        // Verifica status 204 (No Content)
+        if (response.status === 204) {
+             mostrarNotificacao("Consulta cancelada com sucesso!");
+             listarConsultas();
+             document.getElementById("formCancelamento").reset();
+        } else {
+            const data = await response.json().catch(() => null);
+            let msg = data && data.message ? data.message : "Erro ao cancelar.";
+            throw new Error(msg);
         }
-        throw new Error(msg);
-      }
     } catch (error) {
-      resultDiv.className = "result error";
-      resultDiv.innerText = error.message;
-      resultDiv.style.display = "block";
+        Swal.fire('Erro!', error.message, 'error');
     }
-  });
+});

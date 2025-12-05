@@ -1,14 +1,11 @@
 package com.medpro.medpro.controller;
 
-import com.medpro.medpro.domain.validacoes.ValidadorAgendamentoDeConsulta;
-import com.medpro.medpro.domain.validacoes.cancelamento.ValidadorCancelamentoDeConsulta;
-import com.medpro.medpro.infra.execption.ValidacaoException;
-import com.medpro.medpro.model.dto.*;
-import com.medpro.medpro.model.entity.Consulta;
-import com.medpro.medpro.model.entity.Medico;
-import com.medpro.medpro.repository.ConsultaRepository;
-import com.medpro.medpro.repository.MedicoRepository;
-import com.medpro.medpro.repository.PacienteRepository;
+import com.medpro.medpro.domain.consulta.AgendaDeConsultas;
+import com.medpro.medpro.model.dto.DadosAgendamentoConsulta;
+import com.medpro.medpro.model.dto.DadosCancelamentoConsulta;
+import com.medpro.medpro.model.dto.DadosDetalhamentoConsulta;
+import com.medpro.medpro.model.dto.DadosListagemConsulta;
+import com.medpro.medpro.repository.ConsultaRepository; // Apenas para listagem simples (opcional mover para service também)
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,88 +14,36 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.util.UriComponentsBuilder; // Import necessário
-
-import java.util.List;
 
 @RestController
 @RequestMapping("consultas")
 public class ConsultaController {
 
     @Autowired
-    private ConsultaRepository consultaRepository;
-
+    private AgendaDeConsultas agenda;
+    
     @Autowired
-    private MedicoRepository medicoRepository;
-
-    @Autowired
-    private PacienteRepository pacienteRepository;
-
-    @Autowired
-    private List<ValidadorAgendamentoDeConsulta> validadores;
-
-    @Autowired
-    private List<ValidadorCancelamentoDeConsulta> validadoresCancelamento;
+    private ConsultaRepository consultaRepository; // Usado apenas para leitura (CQRS simplificado)
 
     @PostMapping
     @Transactional
-    public ResponseEntity detalhar(@RequestBody @Valid DadosAgendamentoConsulta dados, UriComponentsBuilder uriBuilder) {
-        
-        if (!pacienteRepository.existsById(dados.idPaciente())) {
-            throw new ValidacaoException("Id do paciente informado não existe!");
-        }
-
-        if (dados.idMedico() != null && !medicoRepository.existsById(dados.idMedico())) {
-            throw new ValidacaoException("Id do médico informado não existe!");
-        }
-
-        validadores.forEach(v -> v.validar(dados));
-
-        var paciente = pacienteRepository.getReferenceById(dados.idPaciente());
-        var medico = escolherMedico(dados);
-
-        if (medico == null) {
-            throw new ValidacaoException("Não existe médico disponível nessa data!");
-        }
-
-        var consulta = new Consulta(null, medico, paciente, dados.data(), null);
-        consultaRepository.save(consulta);
-        var dto = new DadosDetalhamentoConsulta(consulta);
-        var uri = uriBuilder.path("/consultas/{id}").buildAndExpand(consulta.getId()).toUri();
-        return ResponseEntity.created(uri).body(dto);
+    public ResponseEntity detalhar(@RequestBody @Valid DadosAgendamentoConsulta dados) {
+        var dto = agenda.agendar(dados);
+        return ResponseEntity.ok(dto);
     }
 
     @DeleteMapping
     @Transactional
-    public ResponseEntity<Void> cancelar(@RequestBody @Valid DadosCancelamentoConsulta dados) {
-        if (!consultaRepository.existsById(dados.idConsulta())) {
-            throw new ValidacaoException("Id da consulta informado não existe!");
-        }
-
-        validadoresCancelamento.forEach(v -> v.validar(dados));
-
-        var consulta = consultaRepository.getReferenceById(dados.idConsulta());
-        consulta.cancelar(dados.motivo()); 
+    public ResponseEntity cancelar(@RequestBody @Valid DadosCancelamentoConsulta dados) {
+        agenda.cancelar(dados);
         return ResponseEntity.noContent().build();
     }
-
+    
+    // Leitura simples pode permanecer aqui ou ir para uma classe de ConsultaService
     @GetMapping
     public ResponseEntity<Page<DadosListagemConsulta>> listar(
             @PageableDefault(size = 10, sort = { "data" }) Pageable paginacao) {
-        Page<Consulta> consultas = consultaRepository.findAll(paginacao);
-        Page<DadosListagemConsulta> page = consultas.map(DadosListagemConsulta::new);
+        var page = consultaRepository.findAll(paginacao).map(DadosListagemConsulta::new);
         return ResponseEntity.ok(page);
-    }
-
-    private Medico escolherMedico(DadosAgendamentoConsulta dados) {
-        if (dados.idMedico() != null) {
-            return medicoRepository.getReferenceById(dados.idMedico());
-        }
-
-        if (dados.especialidade() == null) {
-            throw new ValidacaoException("Especialidade é obrigatória quando médico não for escolhido!");
-        }
-
-        return medicoRepository.escolherMedicoAleatorioLivreNaData(dados.especialidade(), dados.data());
     }
 }
